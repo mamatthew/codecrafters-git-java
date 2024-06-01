@@ -7,9 +7,7 @@ import java.util.zip.DataFormatException;
 
 public class Main {
   public static void main(String[] args){
-    System.out.println("Number of args: " + args.length);
     // You can use print statements as follows for debugging, they'll be visible when running tests.
-    System.out.println("Logs from your program will appear here!");
 
     // Uncomment this block to pass the first stage
     
@@ -32,7 +30,6 @@ public class Main {
       }
       case "cat-file" -> {
         final String hash = args[2];
-        System.out.println("Hash: " + hash);
         final File object = new File(".git/objects/" + hash.substring(0, 2) + "/" + hash.substring(2));
     
         try {
