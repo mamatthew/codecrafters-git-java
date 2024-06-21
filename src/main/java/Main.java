@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.util.zip.Inflater;
 import java.util.zip.DataFormatException;
+import java.security.MessageDigest;
 
 public class Main {
   public static void main(String[] args){
@@ -40,6 +41,40 @@ public class Main {
           String decompressedFile = new String(decompressed);
           System.out.print(decompressedFile.substring(decompressedFile.indexOf('\0') + 1));
 
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+      case "hash-object" -> {
+        // check for presence of -w flag
+        String content = null;
+        boolean write = false;
+        if (args[1].equals("-w")) {
+          content = args[2];
+          write = true;
+        } else {
+          content = args[1];
+        }
+        // content is the path to the file to be compressed. uncompress the file using zlib
+        try {
+          final byte[] bytes = Files.readAllBytes(new File(content).toPath());
+          final byte[] decompressed = decompress(bytes);
+
+          String decompressedFile = new String(decompressed);
+
+          // calculate the hash of the decompressed file
+          // The input for the SHA hash is the header (blob <size>\0) + the actual contents of the file, not just the contents of the file.
+          String hash = new String(MessageDigest.getInstance("SHA-256").digest(("blob " + decompressedFile.length() + "\0" + decompressedFile).getBytes()));
+          if (!write) {
+            System.out.println(hash);
+            return;
+          }
+          final File object = new File(".git/objects/" + hash.substring(0, 2) + "/" + hash.substring(2));
+          object.getParentFile().mkdirs();
+          object.createNewFile();
+          // write the file located at content to the object file
+          Files.write(object.toPath(), decompressed);
+          System.out.println(hash);
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
