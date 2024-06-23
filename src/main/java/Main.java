@@ -47,6 +47,8 @@ public class Main {
         File[] files = workingDirectory.listFiles();
         // sort files by name
         Arrays.sort(files, Comparator.comparing(File::getName));
+        // remove the .git directory from the list of files
+        files = Arrays.stream(files).filter(file -> !file.getName().equals(".git")).toArray(File[]::new);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         for (File file : files) {
             if (Files.isDirectory(file.toPath())) {
