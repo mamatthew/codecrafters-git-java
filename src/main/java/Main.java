@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.zip.DataFormatException;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
@@ -62,7 +60,6 @@ public class Main {
         File workingDirectory = new File(path);
         File[] files = workingDirectory.listFiles();
         // sort files in alphabetical order by file name
-        Arrays.sort(files, Comparator.comparing(File::getName));
         // print the name of each file in the tree to the console);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         for (File file : files) {
