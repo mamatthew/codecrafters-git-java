@@ -33,8 +33,35 @@ public class Main {
       case "write-tree" -> {
           writeTree(".");
       }
+      case "commit-tree" -> {
+          commitTree(args);
+      }
       default -> System.out.println("Unknown command: " + command);
     }
+  }
+
+    private static void commitTree(String[] args) {
+        final String treeSha = args[1];
+        final String parentSha = args[3];
+        final String message = args[5];
+        final long date = System.currentTimeMillis() / 1000;
+        final String dateStr = String.valueOf(date);
+        final String content = "tree " + treeSha + "\nparent " + parentSha + "\nauthor codecrafter <codecrafter@hotmail.com>"+ String.valueOf(System.currentTimeMillis() / 1000) + "+0000\ncommitter codecrafter <codecrafter@hotmail.com>" + String.valueOf(System.currentTimeMillis() / 1000) + "+0000\n\n" + message +"\n";
+
+        try {
+            byte[] contentBytes = content.getBytes();
+            byte[] commitHeader = ("commit " + contentBytes.length + "\0").getBytes();
+            byte[] fullCommit = new byte[commitHeader.length + contentBytes.length];
+            System.arraycopy(commitHeader, 0, fullCommit, 0, commitHeader.length);
+            System.arraycopy(contentBytes, 0, fullCommit, commitHeader.length, contentBytes.length);
+            byte[] hash = MessageDigest.getInstance("SHA-1").digest(fullCommit);
+            String hashStr = byteArrayToHexString(hash);
+            writeObject(hashStr, fullCommit);
+            System.out.println(hashStr);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
   }
 
     private static void writeTree(String path) {
@@ -45,17 +72,11 @@ public class Main {
     private static byte[] writeTreeRecursive(String path) {
         File workingDirectory = new File(path);
         File[] files = workingDirectory.listFiles();
-        // sort files by name
         Arrays.sort(files, Comparator.comparing(File::getName));
-        // remove the .git directory from the list of files
         files = Arrays.stream(files).filter(file -> !file.getName().equals(".git")).toArray(File[]::new);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         for (File file : files) {
             if (Files.isDirectory(file.toPath())) {
-                if (file.getName().equals(".git")) {
-                    continue;
-                }
-                //System.out.println(file.getAbsolutePath() + " is a directory");
                 try {
                     byte[] hash = writeTreeRecursive(file.getAbsolutePath());
                     outputStream.write("40000 ".getBytes());
@@ -67,7 +88,6 @@ public class Main {
                 }
 
             } else {
-                //System.out.println(file.getAbsolutePath() + " is a file");
                 try {
                     byte[] blob = Files.readAllBytes(file.toPath());
                     byte[] blobHeader = ("blob " + blob.length + "\0").getBytes();
@@ -107,21 +127,13 @@ public class Main {
 
     private static void lsTree(String[] args) {
       if (args.length == 3) {
-          // $ /path/to/your_git.sh ls-tree --name-only <tree_sha>
           final String treeSha = args[2];
-          // search the ./git/objects directory for the file with the name of the treeSha
           final File object = new File(".git/objects/" + treeSha.substring(0, 2) + "/" + treeSha.substring(2));
-        /*
-            format of the tree object (without new lines) is:
-           tree <size>\0<mode> <name>\0<20_byte_sha><mode> <name>\0<20_byte_sha>
-         */
           try {
               byte[] bytes = Files.readAllBytes(object.toPath());
               byte[] decompressed = decompress(bytes);
-              // print the name of each file in the tree to the console
               String decompressedFile = new String(decompressed);
               String[] lines = decompressedFile.split("\0");
-              // ["tree <size>", "<mode> <name>", "<20_byte_sha><mode> <name>", "<20_byte_sha><mode> <name>", "<20_byte_sha>"]
               for (int i = 1; i < lines.length - 1; i++) {
                   String[] parts = lines[i].split(" ");
                   if (parts.length > 1)
