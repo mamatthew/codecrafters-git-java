@@ -10,6 +10,7 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
 
 public class Main {
+
   public static void main(String[] args){
     
     final String command = args[0];
@@ -24,9 +25,43 @@ public class Main {
       case "hash-object" -> {
           hashObject(args);
       }
+      case "ls-tree" -> {
+          lsTree(args);
+      }
       default -> System.out.println("Unknown command: " + command);
     }
   }
+
+    private static void lsTree(String[] args) {
+      if (args.length == 3) {
+          // $ /path/to/your_git.sh ls-tree --name-only <tree_sha>
+          final String treeSha = args[2];
+          // search the ./git/objects directory for the file with the name of the treeSha
+          final File object = new File(".git/objects/" + treeSha.substring(0, 2) + "/" + treeSha.substring(2));
+        /*
+            format of the tree object (without new lines) is:
+           tree <size>\0<mode> <name>\0<20_byte_sha><mode> <name>\0<20_byte_sha>
+         */
+          try {
+              byte[] bytes = Files.readAllBytes(object.toPath());
+              byte[] decompressed = decompress(bytes);
+              // print the name of each file in the tree to the console
+              String decompressedFile = new String(decompressed);
+              String[] lines = decompressedFile.split("\0");
+              // ["tree <size>", "<mode> <name>", "<20_byte_sha><mode> <name>", "<20_byte_sha><mode> <name>", "<20_byte_sha>"]
+              for (int i = 1; i < lines.length - 1; i++) {
+                  String[] parts = lines[i].split(" ");
+                  System.out.println(parts[1]);
+              }
+
+          } catch (Exception e) {
+              throw new RuntimeException(e);
+          }
+      } else if (args.length == 2) {
+          // TODO: implement the case where the user wants to see the full tree object
+      }
+
+    }
 
     private static void hashObject(String[] args) {
         String fileName = null;
