@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.zip.DataFormatException;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
@@ -28,9 +30,102 @@ public class Main {
       case "ls-tree" -> {
           lsTree(args);
       }
+      case "write-tree" -> {
+          writeTree(".");
+      }
       default -> System.out.println("Unknown command: " + command);
     }
   }
+
+    private static String toHexSHA(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : data) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    private static void writeTree(String path) {
+        byte[] sha = writeTreeRecursive(path);
+        System.out.println(byteArrayToHexString(sha));
+    }
+
+    private static byte[] writeTreeRecursive(String path) {
+      /*
+      * 1. iterate through files and directories in working directory
+        - for files, create a blob object from it and record its SHA hash
+        - for directories, recursively create a tree object and record its SHA hash
+        2. Once you have all SHA hashes for a given tree, write the tree object to the ./git/objects directory
+        3. Generate the SHA hash for the tree object and print it to the console
+        *  The tree object format is:   tree <size>\0<mode> <name>\0<20_byte_sha><mode> <name>\0<20_byte_sha>
+      * */
+        File workingDirectory = new File(path);
+        File[] files = workingDirectory.listFiles();
+        // sort files in alphabetical order by file name
+        Arrays.sort(files, Comparator.comparing(File::getName));
+        // print the name of each file in the tree to the console);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        for (File file : files) {
+            if (Files.isDirectory(file.toPath())) {
+                if (file.getName().equals(".git")) {
+                    continue;
+                }
+                // recursively create a tree object
+                // write the tree object to the ./git/objects directory
+                // record the SHA hash of the tree object
+                //System.out.println("This is a directory: " + file.getAbsolutePath());
+                try {
+                    byte[] hash = writeTreeRecursive(file.getAbsolutePath());
+                    outputStream.write("40000 ".getBytes());
+                    outputStream.write(file.getName().getBytes());
+                    outputStream.write(0);
+                    outputStream.write(hash);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+            } else {
+                // create a blob object
+                // record the SHA hash of the blob object
+                //System.out.println("This is a file: " + file.getAbsolutePath());
+                try {
+                    byte[] blob = Files.readAllBytes(file.toPath());
+                    byte[] blobHeader = ("blob " + blob.length + "\0").getBytes();
+                    byte[] fullBlob = new byte[blobHeader.length + blob.length];
+                    System.arraycopy(blobHeader, 0, fullBlob, 0, blobHeader.length);
+                    System.arraycopy(blob, 0, fullBlob, blobHeader.length, blob.length);
+                    byte[] hash = MessageDigest.getInstance("SHA-1").digest(fullBlob);
+                    // append mode <space> file name <null byte> hash to the tree object
+                    if (Files.isRegularFile(file.toPath())) {
+                        outputStream.write("100644 ".getBytes());
+                    } else if (Files.isExecutable(file.toPath())) {
+                        outputStream.write("100755 ".getBytes());
+                    } else if (Files.isSymbolicLink(file.toPath())) {
+                        outputStream.write("120000 ".getBytes());
+                    }
+                    outputStream.write(file.getName().getBytes());
+                    outputStream.write(0);
+                    outputStream.write(hash);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        // write the tree object to the ./git/objects directory
+        try {
+            byte[] treeBytes = outputStream.toByteArray();
+            byte[] treeHeader = ("tree " + treeBytes.length + "\0").getBytes();
+            byte[] fullTree = new byte[treeHeader.length + treeBytes.length];
+            System.arraycopy(treeHeader, 0, fullTree, 0, treeHeader.length);
+            System.arraycopy(treeBytes, 0, fullTree, treeHeader.length, treeBytes.length);
+            byte[] byteHash = MessageDigest.getInstance("SHA-1").digest(fullTree);
+            String hash = byteArrayToHexString(byteHash);
+            writeObject(hash, fullTree);
+            return byteHash;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     private static void lsTree(String[] args) {
       if (args.length == 3) {
