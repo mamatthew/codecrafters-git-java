@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.zip.DataFormatException;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
@@ -35,42 +37,23 @@ public class Main {
     }
   }
 
-    private static String toHexSHA(byte[] data) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : data) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
-
     private static void writeTree(String path) {
         byte[] sha = writeTreeRecursive(path);
         System.out.println(byteArrayToHexString(sha));
     }
 
     private static byte[] writeTreeRecursive(String path) {
-      /*
-      * 1. iterate through files and directories in working directory
-        - for files, create a blob object from it and record its SHA hash
-        - for directories, recursively create a tree object and record its SHA hash
-        2. Once you have all SHA hashes for a given tree, write the tree object to the ./git/objects directory
-        3. Generate the SHA hash for the tree object and print it to the console
-        *  The tree object format is:   tree <size>\0<mode> <name>\0<20_byte_sha><mode> <name>\0<20_byte_sha>
-      * */
         File workingDirectory = new File(path);
         File[] files = workingDirectory.listFiles();
-        // sort files in alphabetical order by file name
-        // print the name of each file in the tree to the console);
+        // sort files by name
+        Arrays.sort(files, Comparator.comparing(File::getName));
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         for (File file : files) {
             if (Files.isDirectory(file.toPath())) {
                 if (file.getName().equals(".git")) {
                     continue;
                 }
-                // recursively create a tree object
-                // write the tree object to the ./git/objects directory
-                // record the SHA hash of the tree object
-                //System.out.println("This is a directory: " + file.getAbsolutePath());
+                //System.out.println(file.getAbsolutePath() + " is a directory");
                 try {
                     byte[] hash = writeTreeRecursive(file.getAbsolutePath());
                     outputStream.write("40000 ".getBytes());
@@ -82,9 +65,7 @@ public class Main {
                 }
 
             } else {
-                // create a blob object
-                // record the SHA hash of the blob object
-                //System.out.println("This is a file: " + file.getAbsolutePath());
+                //System.out.println(file.getAbsolutePath() + " is a file");
                 try {
                     byte[] blob = Files.readAllBytes(file.toPath());
                     byte[] blobHeader = ("blob " + blob.length + "\0").getBytes();
@@ -92,7 +73,6 @@ public class Main {
                     System.arraycopy(blobHeader, 0, fullBlob, 0, blobHeader.length);
                     System.arraycopy(blob, 0, fullBlob, blobHeader.length, blob.length);
                     byte[] hash = MessageDigest.getInstance("SHA-1").digest(fullBlob);
-                    // append mode <space> file name <null byte> hash to the tree object
                     if (Files.isRegularFile(file.toPath())) {
                         outputStream.write("100644 ".getBytes());
                     } else if (Files.isExecutable(file.toPath())) {
@@ -108,7 +88,6 @@ public class Main {
                 }
             }
         }
-        // write the tree object to the ./git/objects directory
         try {
             byte[] treeBytes = outputStream.toByteArray();
             byte[] treeHeader = ("tree " + treeBytes.length + "\0").getBytes();
@@ -143,7 +122,8 @@ public class Main {
               // ["tree <size>", "<mode> <name>", "<20_byte_sha><mode> <name>", "<20_byte_sha><mode> <name>", "<20_byte_sha>"]
               for (int i = 1; i < lines.length - 1; i++) {
                   String[] parts = lines[i].split(" ");
-                  System.out.println(parts[1]);
+                  if (parts.length > 1)
+                        System.out.println(parts[1]);
               }
 
           } catch (Exception e) {
